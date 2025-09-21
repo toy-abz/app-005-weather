@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Day05 — 天気予報（最小機能版）</title>
+  <meta name="description" content="都市名を入力して現在の天気と気温を表示するシンプルなWebアプリ（OpenWeatherMap API使用）。">
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#121836; --text:#e9ecf1; --muted:#9aa3b2; --accent:#7aa2ff; --ok:#6efacc;
+      --shadow:0 10px 24px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:flex; justify-content:center; align-items:center;
+      background:radial-gradient(1000px 500px at 80% -10%,#16204a,transparent),var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;
+    }
+    .app{
+      width:min(96vw,560px); background:linear-gradient(180deg,rgba(255,255,255,.03),transparent),var(--panel);
+      border:1px solid rgba(255,255,255,.06); border-radius:18px; box-shadow:var(--shadow);
+      padding:20px 20px 24px;
+    }
+    h1{margin:0 0 8px; font-size:20px}
+    .muted{color:var(--muted); font-size:12px}
+    .row{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap}
+    input[type=text]{
+      flex:1; padding:10px 12px; border-radius:12px; border:1px solid #2a3566; background:#0f1430; color:var(--text);
+    }
+    button{
+      padding:10px 14px; border-radius:12px; border:0; cursor:pointer; font-weight:600;
+      background:linear-gradient(180deg,var(--accent),#557aff); color:#071022;
+    }
+    .card{
+      margin-top:14px; padding:14px; border-radius:12px; background:#0f1430; border:1px solid #2a3566;
+    }
+    .city{font-size:18px; margin:0 0 6px}
+    .temp{font-size:28px; font-weight:700}
+    .desc{color:var(--muted); font-size:14px}
+    .error{margin-top:12px; font-size:14px; color:#ffb3b3}
+    .sr{position:absolute; left:-9999px}
+    a{color:var(--ok)}
+    footer{margin-top:12px; color:var(--muted); font-size:12px}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0f1430; border:1px solid #28305b; padding:2px 6px; border-radius:6px;}
+  </style>
+</head>
+<body>
+  <main class="app" role="application" aria-labelledby="title">
+    <h1 id="title">Day05 — 天気予報（最小機能版）</h1>
+    <div class="muted">都市名を入力して現在の天気と気温（℃）を表示します。Enterで検索できます。</div>
+
+    <div class="row" aria-label="検索フォーム">
+      <input id="city" type="text" placeholder="例: Tokyo / Osaka / Sapporo" aria-label="都市名">
+      <button id="search">検索</button>
+    </div>
+
+    <section id="result" class="card" aria-live="polite" aria-atomic="true" style="display:none"></section>
+    <div id="error" class="error" aria-live="assertive"></div>
+
+    <footer>
+      <div>Powered by OpenWeatherMap API（学習用途）</div>
+      <div>ショートカット: <span class="kbd">Enter</span> 検索</div>
+    </footer>
+    <div id="a11y" class="sr" aria-live="assertive"></div>
+  </main>
+
+<script>
+(function(){
+  // ⭐ ここに自分のAPIキーを入れてください（OpenWeatherMapで無料取得）
+  const API_KEY = "YOUR_API_KEY_HERE"; // ← 置き換え必須
+  const ENDPOINT = "https://api.openweathermap.org/data/2.5/weather";
+
+  const $ = (s)=>document.querySelector(s);
+  const input = $("#city");
+  const btn = $("#search");
+  const result = $("#result");
+  const err = $("#error");
+  const a11y = $("#a11y");
+
+  function setError(msg){
+    err.textContent = msg || "";
+  }
+
+  function renderWeather(data){
+    const name = data.name || "";
+    const weather = (data.weather && data.weather[0]) ? data.weather[0] : null;
+    const desc = weather ? weather.description : "—";
+    const temp = data.main ? Math.round(data.main.temp) : "—";
+    const icon = weather ? weather.icon : null;
+    const iconUrl = icon ? `https://openweathermap.org/img/wn/${icon}@2x.png` : null;
+
+    result.innerHTML = `
+      <div class="city">${name}</div>
+      <div class="temp">${temp}℃</div>
+      <div class="desc">${desc}${iconUrl ? ` <img src="${iconUrl}" alt="" style="vertical-align:middle;width:40px;height:40px">` : ""}</div>
+    `;
+    result.style.display = "block";
+  }
+
+  async function search(){
+    setError("");
+    result.style.display = "none";
+    const q = (input.value||"").trim();
+    if(!q){ setError("都市名を入力してください"); return; }
+    if(API_KEY === "YOUR_API_KEY_HERE"){ setError("APIキーを設定してください（コード内の API_KEY を置き換え）"); return; }
+
+    try{
+      const url = `${ENDPOINT}?q=${encodeURIComponent(q)}&appid=${API_KEY}&units=metric&lang=ja`;
+      const res = await fetch(url);
+      if(!res.ok){
+        if(res.status === 404){ setError("都市が見つかりませんでした。別の綴り/都市名でお試しください。"); }
+        else { setError("取得に失敗しました（" + res.status + "）"); }
+        return;
+      }
+      const data = await res.json();
+      renderWeather(data);
+      a11y.textContent = `${data.name} の天気を表示しました。`;
+    }catch(e){
+      setError("通信エラーが発生しました。ネットワークをご確認ください。");
+    }
+  }
+
+  btn.addEventListener("click", search);
+  input.addEventListener("keydown", (e)=>{ if(e.key === "Enter") search(); });
+
+  // 初回フォーカス
+  input.focus();
+})();
+</script>
+</body>
+</html>
